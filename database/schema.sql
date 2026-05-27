@@ -1,0 +1,65 @@
+CREATE DATABASE IF NOT EXISTS smartbag;
+USE smartbag;
+
+CREATE TABLE IF NOT EXISTS users (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  username      VARCHAR(64) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id          TINYINT UNSIGNED PRIMARY KEY,
+  name        VARCHAR(32) NOT NULL,
+  last_seen   DATETIME
+);
+
+INSERT IGNORE INTO devices (id, name) VALUES
+  (1, 'bagA'),
+  (2, 'bagB');
+
+CREATE TABLE IF NOT EXISTS gps_logs (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id  TINYINT UNSIGNED NOT NULL,
+  lat        DOUBLE NOT NULL,
+  lng        DOUBLE NOT NULL,
+  valid      TINYINT(1) NOT NULL DEFAULT 0,
+  relayed    TINYINT(1) NOT NULL DEFAULT 0,
+  recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS weight_logs (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id  TINYINT UNSIGNED NOT NULL,
+  grams      FLOAT NOT NULL,
+  recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS tilt_logs (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id  TINYINT UNSIGNED NOT NULL,
+  pitch      FLOAT NOT NULL,
+  roll       FLOAT NOT NULL,
+  flat       TINYINT(1) NOT NULL,
+  recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS tamper_alerts (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id   TINYINT UNSIGNED NOT NULL,
+  confidence  FLOAT NOT NULL,
+  recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+);
+
+CREATE TABLE IF NOT EXISTS status_logs (
+  id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id       TINYINT UNSIGNED NOT NULL,
+  open            TINYINT(1) NOT NULL,
+  magnet_detected TINYINT(1) NOT NULL,
+  recorded_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (device_id) REFERENCES devices(id)
+);

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Bag — Sign In</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    }
+
+    h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 4px; }
+    h1 span { color: #6366f1; }
+    .subtitle { font-size: .85rem; color: #94a3b8; margin-bottom: 28px; }
+
+    .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; }
+    .tab {
+      flex: 1; text-align: center; padding: 8px;
+      font-size: .85rem; font-weight: 600; color: #94a3b8;
+      cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    }
+    .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+
+    label { display: block; font-size: .8rem; font-weight: 600; color: #64748b; margin-bottom: 4px; }
+    input {
+      width: 100%; padding: 10px 12px;
+      border: 1px solid #e2e8f0; border-radius: 8px;
+      font-size: .9rem; color: #1e293b;
+      margin-bottom: 14px; outline: none;
+    }
+    input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px #eef2ff; }
+
+    button[type=submit] {
+      width: 100%; padding: 11px;
+      background: #6366f1; color: #fff;
+      border: none; border-radius: 8px;
+      font-size: .95rem; font-weight: 600;
+      cursor: pointer; margin-top: 4px;
+    }
+    button[type=submit]:hover { background: #4f46e5; }
+
+    #error-msg {
+      display: none;
+      background: #fef2f2; color: #dc2626;
+      border: 1px solid #fca5a5;
+      border-radius: 8px; padding: 10px 12px;
+      font-size: .82rem; margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>Smart <span>Bag</span></h1>
+  <p class="subtitle">Live luggage tracking dashboard</p>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-login" onclick="showTab('login')">Sign In</div>
+    <div class="tab" id="tab-register" onclick="showTab('register')">Register</div>
+  </div>
+
+  <form id="auth-form" onsubmit="submitForm(event)">
+    <label>Username</label>
+    <input type="text" id="username" autocomplete="username" required />
+
+    <label>Password</label>
+    <input type="password" id="password" autocomplete="current-password" required />
+
+    <button type="submit" id="submit-btn">Sign In</button>
+    <div id="error-msg"></div>
+  </form>
+</div>
+
+<script>
+  let mode = 'login';
+
+  function showTab(t) {
+    mode = t;
+    document.getElementById('tab-login').classList.toggle('active', t === 'login');
+    document.getElementById('tab-register').classList.toggle('active', t === 'register');
+    document.getElementById('submit-btn').textContent = t === 'login' ? 'Sign In' : 'Create Account';
+    document.getElementById('error-msg').style.display = 'none';
+  }
+
+  async function submitForm(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.error || 'Something went wrong.';
+        errEl.style.display = 'block';
+        return;
+      }
+      localStorage.setItem('sb_token', data.token);
+      localStorage.setItem('sb_user', data.username);
+      window.location.href = '/';
+    } catch {
+      errEl.textContent = 'Network error — is the server running?';
+      errEl.style.display = 'block';
+    }
+  }
+</script>
+</body>
+</html>

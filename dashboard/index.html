@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Bag Dashboard</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/mqtt@5.7.3/dist/mqtt.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: #ffffff;
+      border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .01em; }
+    header h1 span { color: #6366f1; }
+
+    .header-right { display: flex; align-items: center; gap: 16px; }
+
+    #user-info { font-size: .82rem; color: #64748b; }
+    #user-info strong { color: #1e293b; }
+
+    #logout-btn {
+      font-size: .78rem;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      cursor: pointer;
+    }
+    #logout-btn:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
+
+    #mqtt-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .8rem;
+      color: #64748b;
+    }
+    #mqtt-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #ef4444;
+      transition: background .4s;
+    }
+    #mqtt-dot.connected  { background: #22c55e; }
+    #mqtt-dot.connecting { background: #f59e0b; }
+
+    /* ── Layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      flex: 1;
+      gap: 0;
+    }
+
+    /* ── Sidebar ── */
+    aside {
+      background: #ffffff;
+      border-right: 1px solid #e2e8f0;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+    }
+
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .card-title {
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+
+    /* Tamper banner */
+    #tamper-banner {
+      display: none;
+      background: #fee2e2;
+      border-bottom: 2px solid #ef4444;
+      padding: 12px 24px;
+      font-size: .92rem;
+      font-weight: 700;
+      color: #b91c1c;
+      text-align: center;
+      letter-spacing: .04em;
+    }
+    #tamper-banner.visible {
+      display: block;
+      animation: tamper-pulse 1s ease-in-out infinite alternate;
+    }
+    @keyframes tamper-pulse {
+      from { background: #fee2e2; }
+      to   { background: #fca5a5; }
+    }
+    #tamper-confidence { font-weight: 400; font-size: .82rem; margin-left: 10px; color: #dc2626; }
+
+    /* Relay banner */
+    #relay-banner {
+      display: none;
+      background: #eef2ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: .82rem;
+      color: #4338ca;
+    }
+    #relay-banner.visible { display: block; }
+
+    /* GPS card */
+    .coord-row { display: flex; justify-content: space-between; font-size: .85rem; margin-bottom: 4px; }
+    .coord-label { color: #94a3b8; }
+    .coord-value { font-variant-numeric: tabular-nums; font-weight: 600; }
+    #gps-valid-badge {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #94a3b8;
+      border: 1px solid #e2e8f0;
+    }
+    #gps-valid-badge.valid { background: #dcfce7; color: #16a34a; border-color: #86efac; }
+
+    /* Weight card */
+    #weight-value {
+      font-size: 2.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: #6366f1;
+      line-height: 1;
+    }
+    #weight-unit { font-size: .9rem; color: #94a3b8; margin-top: 4px; }
+
+    /* Status pills */
+    .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .status-pill {
+      text-align: center;
+      padding: 10px 8px;
+      border-radius: 8px;
+      font-size: .8rem;
+      font-weight: 600;
+      background: #f1f5f9;
+      color: #94a3b8;
+      border: 1px solid #e2e8f0;
+      transition: all .3s;
+    }
+    .status-pill.active-good { background: #dcfce7; color: #16a34a; border-color: #86efac; }
+    .status-pill.active-warn { background: #fef3c7; color: #d97706; border-color: #fcd34d; }
+    .status-pill.active-info { background: #dbeafe; color: #2563eb; border-color: #93c5fd; }
+
+    /* Tilt */
+    .tilt-row { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; margin-bottom: 6px; }
+    .tilt-label { color: #94a3b8; }
+    .tilt-bar-wrap { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; margin: 0 10px; overflow: hidden; }
+    .tilt-bar { height: 100%; border-radius: 3px; background: #6366f1; transition: width .3s; }
+    .tilt-num { width: 48px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+    /* Bag B */
+    #bagb-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ef4444; margin-right: 6px; transition: background .4s; }
+    #bagb-dot.alive { background: #22c55e; }
+    #bagb-last { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
+
+    /* Map */
+    #map { width: 100%; height: 100%; min-height: 400px; }
+
+    @media (max-width: 700px) {
+      main { grid-template-columns: 1fr; grid-template-rows: auto 380px; }
+      aside { border-right: none; border-bottom: 1px solid #e2e8f0; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Smart <span>Bag</span> Dashboard</h1>
+  <div class="header-right">
+    <div id="user-info">Signed in as <strong id="username-display">—</strong></div>
+    <button id="logout-btn" onclick="logout()">Sign out</button>
+    <div id="mqtt-status">
+      <div id="mqtt-dot" class="connecting"></div>
+      <span id="mqtt-label">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<div id="tamper-banner">⚠ TAMPER DETECTED <span id="tamper-confidence"></span></div>
+
+<main>
+  <aside>
+
+    <div id="relay-banner">📡 Data relayed via <strong>Bag B</strong></div>
+
+    <!-- GPS -->
+    <div class="card">
+      <div class="card-title">GPS Location</div>
+      <div class="coord-row">
+        <span class="coord-label">Latitude</span>
+        <span class="coord-value" id="gps-lat">—</span>
+      </div>
+      <div class="coord-row">
+        <span class="coord-label">Longitude</span>
+        <span class="coord-value" id="gps-lng">—</span>
+      </div>
+      <span id="gps-valid-badge">No Fix</span>
+    </div>
+
+    <!-- Weight -->
+    <div class="card">
+      <div class="card-title">Weight</div>
+      <div id="weight-value">—</div>
+      <div id="weight-unit">grams</div>
+    </div>
+
+    <!-- Status -->
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div class="status-grid">
+        <div class="status-pill" id="pill-open">CLOSED</div>
+        <div class="status-pill" id="pill-magnet">NO MAGNET</div>
+        <div class="status-pill" id="pill-flat">NOT FLAT</div>
+        <div class="status-pill" id="pill-bagb">
+          <span id="bagb-dot"></span>Bag B
+        </div>
+      </div>
+      <div id="bagb-last"></div>
+    </div>
+
+    <!-- Tilt -->
+    <div class="card">
+      <div class="card-title">Tilt</div>
+      <div class="tilt-row">
+        <span class="tilt-label">Pitch</span>
+        <div class="tilt-bar-wrap"><div class="tilt-bar" id="bar-pitch" style="width:50%"></div></div>
+        <span class="tilt-num" id="val-pitch">0°</span>
+      </div>
+      <div class="tilt-row">
+        <span class="tilt-label">Roll</span>
+        <div class="tilt-bar-wrap"><div class="tilt-bar" id="bar-roll" style="width:50%"></div></div>
+        <span class="tilt-num" id="val-roll">0°</span>
+      </div>
+    </div>
+
+  </aside>
+
+  <div id="map"></div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

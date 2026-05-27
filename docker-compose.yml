@@ -1,0 +1,44 @@
+services:
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE:      smartbag
+      MYSQL_USER:          smartbag
+      MYSQL_PASSWORD:      smartbag_pass
+    volumes:
+      - smartbag_mysql_data:/var/lib/mysql          # named volume — data persists
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ports:
+      - "3306:3306"       # expose for TablePlus / DBeaver / MySQL Workbench
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-usmartbag", "-psmartbag_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"       # REST API + serves dashboard HTML
+    volumes:
+      - ./dashboard:/app/dashboard:ro   # dashboard static files served by Express
+      - ./backend/model:/app/model       # persists trained NN weights across rebuilds
+    environment:
+      DB_HOST:     db
+      DB_USER:     smartbag
+      DB_PASSWORD: smartbag_pass
+      DB_NAME:     smartbag
+      # ── Fill in your HiveMQ details ──────────────────────────────────────
+      MQTT_URL:    mqtts://bcb4c3772bb54988bee799265c56c625.s1.eu.hivemq.cloud:8883
+      MQTT_USER:   "hivemq.webclient.1778542081950"
+      MQTT_PASS:   ";0<9En8GIm1$$QwOac>rT"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  smartbag_mysql_data:    # named volume — survives docker-compose down

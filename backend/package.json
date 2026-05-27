@@ -1,0 +1,16 @@
+{
+  "name": "smartbag-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "bcrypt": "^5.1.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mqtt": "^5.7.3",
+    "mysql2": "^3.10.1"
+  }
+}

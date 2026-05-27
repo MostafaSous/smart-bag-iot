@@ -1,0 +1,15 @@
+# AI assistant internal files — do not commit
+CLAUDE.md
+.claude/
+memory/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Environment / secrets
+.env
+*.env
+
+# macOS
+.DS_Store
