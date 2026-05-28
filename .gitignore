@@ -1,8 +1,3 @@
-# AI assistant internal files — do not commit
-CLAUDE.md
-.claude/
-memory/
-
 # Node.js
 node_modules/
 npm-debug.log*
@@ -13,3 +8,17 @@ npm-debug.log*
 
 # macOS
 .DS_Store
+
+# Arduino / PlatformIO
+*.o
+*.a
+*.so
+.pio/
+.vscode/
+.idea/
+
+# Credentials - NEVER commit these
+credentials.h
+*_credentials.h
+secrets/
+config.h
