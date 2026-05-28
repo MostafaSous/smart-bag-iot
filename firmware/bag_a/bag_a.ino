@@ -30,6 +30,9 @@
  *   - HX711
  *   - PubSubClient
  *   - ArduinoJson
+ *
+ * SECURITY: Credentials are loaded from credentials.h
+ * DO NOT COMMIT credentials.h to version control!
  */
 
 #include <Wire.h>
@@ -46,21 +49,21 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 
-// ─── WiFi / MQTT credentials (fill in before flashing) ───────────────────────
-#define WIFI_SSID     ""
-#define WIFI_PASSWORD ""
-#define MQTT_HOST     ""
-#define MQTT_PORT     
-#define MQTT_USER     ""
-#define MQTT_PASS     ""
-#define MQTT_CLIENT_ID ""
+// ─── SECURITY: Load credentials from separate file ───────────────────────────
+// Copy credentials.h.example to credentials.h and fill in your values
+// NEVER commit credentials.h to git!
+#include "credentials.h"
 
 // ─── ESP-NOW: MAC address of Bag B ───────────────────────────────────────────
 // BAG_B_WIFI_SSID: the WiFi network Bag B connects to — used to auto-detect channel
-uint8_t BAG_B_MAC[6] = {};
-#define BAG_B_WIFI_SSID  ""   // ← must match WIFI_SSID in bag_b.ino
+uint8_t BAG_B_MAC[6] = {0x44, 0x1D, 0x64, 0xF4, 0x54, 0x14};
+#define BAG_B_WIFI_SSID  "Events"   // ← must match WIFI_SSID in bag_b.ino
 #define BAG_B_CHANNEL    1          // ← fallback only if scan fails
 
+// ─── ESP-NOW Encryption Key ──────────────────────────────────────────────────
+// 16-byte encryption key for ESP-NOW (must match between Bag A and Bag B)
+uint8_t esp_now_key[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+                            0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F};
 
 // ─── Publish intervals ────────────────────────────────────────────────────────
 constexpr long MQTT_PUBLISH_INTERVAL_MS    = 5000;   // publish to cloud every 5 s
@@ -169,7 +172,7 @@ struct SystemState {
   float weightGrams;
 };
 
-// ─── I2C / LCD ────────────────────────────────────────────────────────────────
+// ─── I2C / LCD ───────────────────────────────────────────────────────────[...]
 void setupI2C() {
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 }
@@ -209,7 +212,7 @@ void showScreen(const char *line1, const char *line2) {
   printPaddedLine(1, line2);
 }
 
-// ─── ADXL345 ─────────────────────────────────────────────────────────────────
+// ─── ADXL345 ───────────────────────────────────────────────────────────[...]
 bool initAdxl() {
   for (uint8_t address : kAdxlCandidateAddresses) {
     if (adxl.begin(address)) {
@@ -221,7 +224,7 @@ bool initAdxl() {
   return false;
 }
 
-// ─── HX711 ───────────────────────────────────────────────────────────────────
+// ─── HX711 ────────────────────────────────────────────────────────────[...]
 bool initHx711() {
   scale.begin(HX711_DT_PIN, HX711_SCK_PIN);
   Serial.println("HX711 ready. Remove all weight, taring in 2 seconds...");
@@ -232,7 +235,7 @@ bool initHx711() {
   return true;
 }
 
-// ─── Hall sensor ─────────────────────────────────────────────────────────────
+// ─── Hall sensor ──────────────────────────────────────────────────────────[...]
 bool isMagnetDetected() {
   return digitalRead(HALL_SENSOR_PIN) == HALL_MAGNET_DETECTED_STATE;
 }
@@ -241,7 +244,7 @@ void setHallLed(bool magnetDetected) {
   digitalWrite(HALL_LED_PIN, magnetDetected ? HIGH : LOW);
 }
 
-// ─── WiFi ─────────────────────────────────────────────────────────────────────
+// ─── WiFi ────────────────────────────────────────────────────────────[...]
 void attemptWifiConnect() {
   Serial.print("Connecting to WiFi: ");
   Serial.println(WIFI_SSID);
@@ -257,7 +260,16 @@ void attemptWifiConnect() {
   if (wifiConnected) {
     Serial.print("WiFi connected. IP: ");
     Serial.println(WiFi.localIP());
-    wifiClient.setInsecure();
+    
+    // ─── SECURITY FIX: Use proper TLS certificate verification ───────────
+    if (ca_cert != nullptr) {
+      wifiClient.setCACert(ca_cert);
+      Serial.println("[TLS] Using CA certificate for secure connection.");
+    } else {
+      Serial.println("[WARNING] No CA certificate provided. Using insecure mode.");
+      // wifiClient.setInsecure();  // Only use this if absolutely necessary!
+    }
+    
     mqttClient.setServer(MQTT_HOST, MQTT_PORT);
     mqttClient.setBufferSize(512);
     wifiFailCount = 0;   // WiFi is back — reset counter
@@ -268,7 +280,7 @@ void attemptWifiConnect() {
   }
 }
 
-// ─── MQTT ─────────────────────────────────────────────────────────────────────
+// ─── MQTT ────────���───────────────────────────────────────────────────[...]
 bool ensureMqttConnected() {
   if (mqttClient.connected()) return true;
 
@@ -321,7 +333,7 @@ void publishAllSensors() {
   Serial.println("[MQTT] Published all topics.");
 }
 
-// ─── ESP-NOW ──────────────────────────────────────────────────────────────────
+// ─── ESP-NOW ───────────────────────────────────────────────────────────[...]
 void onEspNowSent(const wifi_tx_info_t *info, esp_now_send_status_t status) {
   (void)info;
   if (status == ESP_NOW_SEND_SUCCESS) Serial.println("[ESP-NOW] ACK received.");
@@ -359,15 +371,20 @@ bool initEspNow() {
   }
   esp_now_register_send_cb(onEspNowSent);
 
+  // ─── SECURITY FIX: Enable encryption for ESP-NOW ─────────────────────
+  esp_now_set_pmk(esp_now_key);
+  
   esp_now_peer_info_t peer = {};
   memcpy(peer.peer_addr, BAG_B_MAC, 6);
   peer.channel = channel;
-  peer.encrypt = false;
+  peer.encrypt = true;  // Enable encryption
+  memcpy(peer.key, esp_now_key, 16);  // Set the encryption key
+  
   if (esp_now_add_peer(&peer) != ESP_OK) {
     Serial.println("ESP-NOW add peer failed.");
     return false;
   }
-  Serial.printf("[ESP-NOW] Ready on channel %d.\n", channel);
+  Serial.printf("[ESP-NOW] Ready on channel %d (encrypted).\n", channel);
   return true;
 }
 
@@ -387,7 +404,7 @@ void sendEspNow() {
   Serial.println("[ESP-NOW] Packet sent to Bag B.");
 }
 
-// ─── Sensor helpers ───────────────────────────────────────────────────────────
+// ─── Sensor helpers ─────────────────────────────────────────────────────────[...]
 bool isWithinRange(float value, float lower, float upper) {
   return value >= lower && value <= upper;
 }
@@ -536,7 +553,7 @@ void updateLcd(const SystemState &state) {
   printPaddedLine(1, line2);
 }
 
-// ─── setup / loop ─────────────────────────────────────────────────────────────
+// ─── setup / loop ──────────────────────────────────────────────────────────[...]
 void setup() {
   Serial.begin(USB_BAUD_RATE);
   delay(250);
