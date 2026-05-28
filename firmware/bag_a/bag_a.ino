@@ -47,18 +47,18 @@
 #include <esp_wifi.h>
 
 // ─── WiFi / MQTT credentials (fill in before flashing) ───────────────────────
-#define WIFI_SSID     "Eve"
-#define WIFI_PASSWORD "uob@1234"
-#define MQTT_HOST     "bcb4c3772bb54988bee799265c56c625.s1.eu.hivemq.cloud"
-#define MQTT_PORT     8883
-#define MQTT_USER     "hivemq.webclient.1778542081950"
-#define MQTT_PASS     ";0<9En8GIm1$QwOac>rT"
-#define MQTT_CLIENT_ID "bagA"
+#define WIFI_SSID     ""
+#define WIFI_PASSWORD ""
+#define MQTT_HOST     ""
+#define MQTT_PORT     
+#define MQTT_USER     ""
+#define MQTT_PASS     ""
+#define MQTT_CLIENT_ID ""
 
 // ─── ESP-NOW: MAC address of Bag B ───────────────────────────────────────────
 // BAG_B_WIFI_SSID: the WiFi network Bag B connects to — used to auto-detect channel
-uint8_t BAG_B_MAC[6] = {0x44, 0x1D, 0x64, 0xF4, 0x54, 0x14};
-#define BAG_B_WIFI_SSID  "Events"   // ← must match WIFI_SSID in bag_b.ino
+uint8_t BAG_B_MAC[6] = {};
+#define BAG_B_WIFI_SSID  ""   // ← must match WIFI_SSID in bag_b.ino
 #define BAG_B_CHANNEL    1          // ← fallback only if scan fails
 
 
